@@ -1,7 +1,7 @@
 {
-  "name": "ai-life-os-backend",
+  "name": "ai-career-copilot-backend",
   "version": "1.0.0",
-  "description": "Backend for AI Life OS",
+  "description": "Backend for AI Career Copilot",
   "main": "dist/index.js",
   "scripts": {
     "start": "node dist/index.js",
@@ -9,6 +9,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@types/morgan": "^1.9.10",
     "axios": "^1.6.0",
     "cors": "^2.8.5",

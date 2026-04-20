@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Providers from '@/components/Providers';
-import AppShell from '@/components/AppShell';
+import SiteHeader from '@/components/SiteHeader';
 
 export const metadata: Metadata = {
-  title: 'Life OS — AI-Powered Life Tracking',
+  title: 'AI Career Copilot',
   description:
-    'Your personal AI productivity coach. Track goals, habits, and tasks with AI-driven insights and daily planning.',
-  keywords: ['productivity', 'ai', 'goal tracking', 'habit tracker', 'life os'],
+    'Upload a resume or add your skills to get AI-powered career analysis, project ideas, mock interviews, and progress tracking.',
+  keywords: ['career copilot', 'resume analyzer', 'skill gap analysis', 'mock interview', 'openai'],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -15,7 +15,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body>
         <Providers>
-          <AppShell>{children}</AppShell>
+          <SiteHeader />
+          <main>{children}</main>
         </Providers>
       </body>
     </html>
