@@ -1,13 +1,16 @@
 'use client';
 
+import { Trash2 } from 'lucide-react';
 import { CareerProfile } from '@/lib/api';
 
 export default function ProfileSummary({
   profile,
   meta,
+  onClear,
 }: {
   profile: CareerProfile;
   meta?: { aiProvider: string; storage: string; aiConfigured?: boolean; availableProviders?: string[]; warning?: string } | null;
+  onClear?: () => void;
 }) {
   return (
     <div className="panel-stack">
@@ -17,7 +20,15 @@ export default function ProfileSummary({
             <p className="eyebrow">Overview</p>
             <h2>{profile.fullName}</h2>
           </div>
-          <span className="status-pill">{profile.targetRole}</span>
+          <div className="header-actions">
+            {onClear ? (
+              <button className="secondary-button" type="button" onClick={onClear}>
+                <Trash2 size={16} />
+                <span>Clear Analysis</span>
+              </button>
+            ) : null}
+            <span className="status-pill">{profile.targetRole}</span>
+          </div>
         </div>
 
         <p className="lead-copy">{profile.analysis.summary}</p>
