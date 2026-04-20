@@ -19,8 +19,7 @@ export function extractTextFromBase64Document(base64: string, fileName?: string)
         return '';
       }
     })
-    .join(' ')
-    .trim();
+    .join(' ');
 
   const cleaned = [literalMatches.map((segment) => segment.slice(1, -1)).join(' '), decodedHex]
     .join(' ')

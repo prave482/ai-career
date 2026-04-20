@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { CareerProfile, getCareerProfile } from '@/lib/api';
 
 const PROFILE_ID_KEY = 'ai-career-copilot-profile-id';
+const PROFILE_CACHE_KEY = 'ai-career-copilot-profile-cache';
+const PROFILE_META_KEY = 'ai-career-copilot-profile-meta';
 
 type ProfileMeta = {
   aiProvider: string;
@@ -24,6 +26,21 @@ export function useCareerProfile() {
       }
 
       const savedId = window.localStorage.getItem(PROFILE_ID_KEY);
+      const cachedProfile = window.localStorage.getItem(PROFILE_CACHE_KEY);
+      const cachedMeta = window.localStorage.getItem(PROFILE_META_KEY);
+
+      if (cachedProfile) {
+        try {
+          setProfile(JSON.parse(cachedProfile) as CareerProfile);
+          if (cachedMeta) {
+            setMeta(JSON.parse(cachedMeta) as ProfileMeta);
+          }
+        } catch {
+          window.localStorage.removeItem(PROFILE_CACHE_KEY);
+          window.localStorage.removeItem(PROFILE_META_KEY);
+        }
+      }
+
       if (!savedId) {
         setIsBootstrapping(false);
         return;
@@ -33,8 +50,10 @@ export function useCareerProfile() {
         const result = await getCareerProfile(savedId);
         setProfile(result.profile);
       } catch {
-        window.localStorage.removeItem(PROFILE_ID_KEY);
-        setError('We could not load your saved profile. Please analyze your resume again.');
+        if (!cachedProfile) {
+          window.localStorage.removeItem(PROFILE_ID_KEY);
+          setError('We could not load your saved profile. Please analyze your resume again.');
+        }
       } finally {
         setIsBootstrapping(false);
       }
@@ -52,6 +71,10 @@ export function useCareerProfile() {
 
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(PROFILE_ID_KEY, nextProfile.id);
+      window.localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(nextProfile));
+      if (nextMeta) {
+        window.localStorage.setItem(PROFILE_META_KEY, JSON.stringify(nextMeta));
+      }
     }
   };
 
@@ -62,6 +85,8 @@ export function useCareerProfile() {
 
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(PROFILE_ID_KEY);
+      window.localStorage.removeItem(PROFILE_CACHE_KEY);
+      window.localStorage.removeItem(PROFILE_META_KEY);
     }
   };
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { ChangeEvent, FormEvent, useState, useTransition } from 'react';
-import { LoaderCircle } from 'lucide-react';
+import { FileText, LoaderCircle, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { analyzeCareerProfile, CareerProfile } from '@/lib/api';
 
@@ -21,6 +21,8 @@ type FormState = {
   skills: string;
   careerGoals: string;
   resumeText: string;
+  resumeFileBase64: string;
+  resumeFileName: string;
 };
 
 const initialForm: FormState = {
@@ -30,10 +32,25 @@ const initialForm: FormState = {
   skills: '',
   careerGoals: '',
   resumeText: '',
+  resumeFileBase64: '',
+  resumeFileName: '',
 };
 
 function splitCommaList(input: string) {
   return input.split(/[,\n]/).map((item) => item.trim()).filter(Boolean);
+}
+
+function readFileAsBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const [, base64 = ''] = result.split(',');
+      resolve(base64);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file.'));
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function ProfileForm({ onProfileReady }: Props) {
@@ -44,6 +61,33 @@ export default function ProfileForm({ onProfileReady }: Props) {
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     setForm((current) => ({ ...current, [field]: event.target.value }));
+  };
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setForm((current) => ({ ...current, resumeFileBase64: '', resumeFileName: '' }));
+      return;
+    }
+
+    const lowerName = file.name.toLowerCase();
+    if (!lowerName.endsWith('.pdf') && !lowerName.endsWith('.txt') && !lowerName.endsWith('.md')) {
+      toast.error('Upload a PDF, TXT, or MD file.');
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const resumeFileBase64 = await readFileAsBase64(file);
+      setForm((current) => ({
+        ...current,
+        resumeFileBase64,
+        resumeFileName: file.name,
+      }));
+      toast.success(`${file.name} is ready for analysis.`);
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to read the file.');
+    }
   };
 
   const handleSubmit = (event: FormEvent) => {
@@ -58,6 +102,8 @@ export default function ProfileForm({ onProfileReady }: Props) {
           skills: splitCommaList(form.skills),
           careerGoals: splitCommaList(form.careerGoals),
           resumeText: form.resumeText,
+          resumeFileBase64: form.resumeFileBase64,
+          resumeFileName: form.resumeFileName || undefined,
         });
         onProfileReady(result.profile, result.meta);
         toast.success('Career analysis created.');
@@ -105,6 +151,23 @@ export default function ProfileForm({ onProfileReady }: Props) {
       <label>
         Resume text
         <textarea className="textarea" rows={10} value={form.resumeText} onChange={handleChange('resumeText')} placeholder="Paste your resume text here..." />
+      </label>
+
+      <label className="upload-box">
+        <span>Resume file</span>
+        <input type="file" accept=".pdf,.txt,.md" onChange={handleFileChange} />
+        <span className="tag-row">
+          <span className="tag">
+            <Upload size={14} />
+            Upload PDF or TXT
+          </span>
+          {form.resumeFileName ? (
+            <span className="tag">
+              <FileText size={14} />
+              {form.resumeFileName}
+            </span>
+          ) : null}
+        </span>
       </label>
 
       <button className="primary-button" type="submit" disabled={isPending}>

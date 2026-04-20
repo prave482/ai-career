@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createMemoryProfile, findMemoryProfileByEmail, updateMemoryProfile } from '@/lib/memoryStore';
 import { generateCareerSnapshot } from '@/lib/ai.service';
+import { extractTextFromBase64Document } from '@/lib/document';
 
 function normalizeList(input: unknown) {
   if (Array.isArray(input)) return input.map((item) => String(item).trim()).filter(Boolean);
@@ -11,29 +12,25 @@ function normalizeList(input: unknown) {
 function buildSnapshotInput(payload: Record<string, unknown>) {
   const resumeTextInput = String(payload.resumeText ?? '').trim();
   const resumeFileBase64 = payload.resumeFileBase64 ? String(payload.resumeFileBase64) : '';
-  
-  let finalResumeText = resumeTextInput;
-  if (!resumeTextInput && resumeFileBase64) {
-    finalResumeText = '[PDF file uploaded - please analyze based on user skills and target role]';
-  }
-  
+  const resumeFileName = payload.resumeFileName ? String(payload.resumeFileName) : undefined;
+  const extractedResumeText =
+    !resumeTextInput && resumeFileBase64 ? extractTextFromBase64Document(resumeFileBase64, resumeFileName) : '';
+
   return {
     fullName: String(payload.fullName ?? '').trim(),
     email: String(payload.email ?? '').trim().toLowerCase(),
     targetRole: String(payload.targetRole ?? '').trim(),
     careerGoals: normalizeList(payload.careerGoals),
     skills: normalizeList(payload.skills),
-    resumeText: finalResumeText,
-    resumeFileName: payload.resumeFileName ? String(payload.resumeFileName) : undefined,
+    resumeText: (resumeTextInput || extractedResumeText).trim(),
+    resumeFileName,
   };
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    console.log('Analyze request body:', { ...body, resumeFileBase64: body.resumeFileBase64 ? '[BASE64_LENGTH:' + body.resumeFileBase64.length + ']' : undefined });
     const input = buildSnapshotInput(body);
-    console.log('Built input:', { ...input, resumeText: input.resumeText ? '[TEXT_SET]' : '[EMPTY]' });
 
     if (!input.fullName) return NextResponse.json({ success: false, error: 'Full name is required.' }, { status: 400 });
     if (!input.email) return NextResponse.json({ success: false, error: 'Email is required.' }, { status: 400 });
@@ -42,9 +39,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Provide resume text or list at least a few skills.' }, { status: 400 });
     }
 
-    console.log('Calling generateCareerSnapshot...');
     const snapshot = await generateCareerSnapshot(input);
-    console.log('Snapshot generated:', snapshot.aiProvider);
     const now = new Date().toISOString();
 
     const existing = findMemoryProfileByEmail(input.email);

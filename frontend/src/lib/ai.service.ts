@@ -28,6 +28,42 @@ type RoleBlueprint = {
 };
 
 const DEFAULT_ROLE = 'Backend Developer';
+const SKILL_LIBRARY = [
+  'Accessibility',
+  'API Design',
+  'API Integration',
+  'Authentication',
+  'AWS',
+  'CSS',
+  'Databases',
+  'Docker',
+  'Express',
+  'FastAPI',
+  'Git',
+  'HTML',
+  'Java',
+  'JavaScript',
+  'Jest',
+  'Machine Learning',
+  'MongoDB',
+  'MySQL',
+  'Next.js',
+  'Node.js',
+  'Pandas',
+  'PostgreSQL',
+  'Python',
+  'React',
+  'Redis',
+  'REST API',
+  'scikit-learn',
+  'SQL',
+  'Statistics',
+  'Streamlit',
+  'System Design',
+  'Tailwind CSS',
+  'Testing',
+  'TypeScript',
+];
 
 const ROLE_BLUEPRINTS: Record<string, RoleBlueprint> = {
   'Data Scientist': {
@@ -61,7 +97,14 @@ const ROLE_BLUEPRINTS: Record<string, RoleBlueprint> = {
 
 function normalizeRole(role: string) {
   const directMatch = Object.keys(ROLE_BLUEPRINTS).find((item) => item.toLowerCase() === role.toLowerCase());
-  return directMatch ?? DEFAULT_ROLE;
+  if (directMatch) return directMatch;
+
+  const lowerRole = role.toLowerCase();
+  if (lowerRole.includes('data')) return 'Data Scientist';
+  if (lowerRole.includes('front') || lowerRole.includes('ui') || lowerRole.includes('web')) return 'Frontend Developer';
+  if (lowerRole.includes('back') || lowerRole.includes('api') || lowerRole.includes('server')) return 'Backend Developer';
+
+  return DEFAULT_ROLE;
 }
 
 function parseList(input: string) {
@@ -72,9 +115,29 @@ function unique(items: string[]) {
   return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean)));
 }
 
+function sanitizeStringList(input: unknown, limit = 6) {
+  if (!Array.isArray(input)) return [];
+  return unique(input.map((item) => String(item).replace(/\s+/g, ' ').trim())).slice(0, limit);
+}
+
 function deriveSkillsFromResume(text: string) {
-  const tokens = text.split(/[^A-Za-z+#.]+/).map((token) => token.trim()).filter((token) => token.length > 1);
-  return unique(tokens);
+  const lowerText = text.toLowerCase();
+  const matchedLibrarySkills = SKILL_LIBRARY.filter((skill) => lowerText.includes(skill.toLowerCase()));
+  const tokenMatches = text
+    .split(/[^A-Za-z0-9+#.]+/)
+    .map((token) => token.trim())
+    .filter((token) => /^[A-Za-z][A-Za-z0-9+#.]{1,19}$/.test(token));
+  return unique([...matchedLibrarySkills, ...tokenMatches]).slice(0, 18);
+}
+
+function collectEvidenceSkills(input: SnapshotInput, role: string) {
+  const blueprint = ROLE_BLUEPRINTS[role] ?? ROLE_BLUEPRINTS[DEFAULT_ROLE];
+  const currentSkills = unique([...input.skills, ...deriveSkillsFromResume(input.resumeText)]).slice(0, 18);
+  const currentSkillSet = new Set(currentSkills.map((skill) => skill.toLowerCase()));
+  const matchedSkills = blueprint.mustHave.filter((skill) => currentSkillSet.has(skill.toLowerCase()));
+  const missingSkills = blueprint.mustHave.filter((skill) => !currentSkillSet.has(skill.toLowerCase()));
+
+  return { blueprint, currentSkills, matchedSkills, missingSkills };
 }
 
 function computeCompletionScore(missingSkills: string[], projects: CareerProject[], progress: Pick<ProgressSnapshot, 'completedProjects' | 'completedSkills'>) {
@@ -87,12 +150,7 @@ function computeCompletionScore(missingSkills: string[], projects: CareerProject
 
 function buildFallbackSnapshot(input: SnapshotInput): CareerSnapshot {
   const role = normalizeRole(input.targetRole);
-  const blueprint = ROLE_BLUEPRINTS[role] ?? ROLE_BLUEPRINTS[DEFAULT_ROLE];
-  const inferredSkills = deriveSkillsFromResume(input.resumeText);
-  const currentSkills = unique([...input.skills, ...inferredSkills]).slice(0, 18);
-  const currentSkillSet = new Set(currentSkills.map((skill) => skill.toLowerCase()));
-  const matchedSkills = blueprint.mustHave.filter((skill) => currentSkillSet.has(skill.toLowerCase()));
-  const missingSkills = blueprint.mustHave.filter((skill) => !currentSkillSet.has(skill.toLowerCase()));
+  const { blueprint, currentSkills, matchedSkills, missingSkills } = collectEvidenceSkills(input, role);
 
   const analysis: CareerAnalysis = {
     summary: `${input.fullName || 'The candidate'} is targeting ${role} and already shows momentum in ${matchedSkills.slice(0, 3).join(', ') || 'foundational skills'}. The next step is to close the most important gaps and turn that progress into visible portfolio evidence.`,
@@ -134,6 +192,55 @@ function buildFallbackSnapshot(input: SnapshotInput): CareerSnapshot {
   };
 }
 
+function sanitizeProjects(input: unknown, fallback: CareerProject[]) {
+  if (!Array.isArray(input) || !input.length) return fallback;
+
+  const sanitized = input
+    .map((item) => {
+      const project = item as Partial<CareerProject>;
+      const title = String(project.title ?? '').trim();
+      const summary = String(project.summary ?? '').trim();
+      if (!title || !summary) return null;
+
+      return {
+        title,
+        summary,
+        techStack: sanitizeStringList(project.techStack, 6),
+        steps: sanitizeStringList(project.steps, 5),
+        difficulty:
+          project.difficulty === 'Beginner' || project.difficulty === 'Intermediate' || project.difficulty === 'Advanced'
+            ? project.difficulty
+            : 'Intermediate',
+        portfolioValue: String(project.portfolioValue ?? '').trim() || 'Shows role-relevant execution and communication.',
+      } satisfies CareerProject;
+    })
+    .filter((item): item is CareerProject => Boolean(item))
+    .slice(0, 5);
+
+  return sanitized.length ? sanitized : fallback;
+}
+
+function sanitizeInterviewQuestions(input: unknown, fallback: InterviewQuestion[]) {
+  if (!Array.isArray(input) || !input.length) return fallback;
+
+  const sanitized = input
+    .map((item) => {
+      const question = item as Partial<InterviewQuestion>;
+      const text = String(question.question ?? '').trim();
+      if (!text) return null;
+
+      return {
+        question: text,
+        focusArea: String(question.focusArea ?? '').trim() || 'role fundamentals',
+        idealAnswerHint: String(question.idealAnswerHint ?? '').trim() || 'Explain your approach, tradeoffs, implementation details, and measurable impact.',
+      } satisfies InterviewQuestion;
+    })
+    .filter((item): item is InterviewQuestion => Boolean(item))
+    .slice(0, 4);
+
+  return sanitized.length ? sanitized : fallback;
+}
+
 async function callAIJson<T>(prompt: string): Promise<{ provider: string; data: T } | null> {
   const apiKey = process.env.OPENAI_API_KEY || process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
@@ -143,7 +250,7 @@ async function callAIJson<T>(prompt: string): Promise<{ provider: string; data: 
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -159,8 +266,8 @@ async function callAIJson<T>(prompt: string): Promise<{ provider: string; data: 
       const json = await response.json();
       const raw = json.choices?.[0]?.message?.content;
       if (raw) return { provider: 'openai', data: JSON.parse(raw) as T };
-    } catch (e) {
-      console.error('OpenAI error:', e);
+    } catch (error) {
+      console.error('OpenAI error:', error);
     }
   }
 
@@ -173,15 +280,15 @@ async function callAIJson<T>(prompt: string): Promise<{ provider: string; data: 
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             generationConfig: { temperature: 0.4, responseMimeType: 'application/json' },
-            contents: [{ parts: [{ text: 'You are an expert AI career coach. Return valid JSON only.\n' + prompt }] }],
+            contents: [{ parts: [{ text: `You are an expert AI career coach. Return valid JSON only.\n${prompt}` }] }],
           }),
         }
       );
       const json = await response.json();
       const raw = json.candidates?.[0]?.content?.parts?.[0]?.text;
       if (raw) return { provider: 'gemini', data: JSON.parse(raw) as T };
-    } catch (e) {
-      console.error('Gemini error:', e);
+    } catch (error) {
+      console.error('Gemini error:', error);
     }
   }
 
@@ -190,8 +297,15 @@ async function callAIJson<T>(prompt: string): Promise<{ provider: string; data: 
 
 export async function generateCareerSnapshot(input: SnapshotInput): Promise<CareerSnapshot> {
   const fallback = buildFallbackSnapshot(input);
+  const role = normalizeRole(input.targetRole);
+  const evidence = collectEvidenceSkills(input, role);
   const prompt = [
     'Analyze this candidate profile for an AI Career Copilot app.',
+    'Use only the candidate data provided. Do not invent companies, years of experience, projects, certifications, or tools that are not supported by the input.',
+    'If evidence is limited, say that the evidence is limited instead of making assumptions.',
+    `Ground the response in this normalized role: ${role}.`,
+    `Confirmed current skills/evidence: ${JSON.stringify(evidence.currentSkills)}.`,
+    `Role-relevant missing skills based on the role blueprint: ${JSON.stringify(evidence.missingSkills)}.`,
     'Return JSON with keys: analysis, skillGap, projects, interviewQuestions.',
     'analysis must include summary, strengths, weaknesses, missingSkills.',
     'skillGap must include role, currentSkills, missingSkills, learningPath.',
@@ -204,10 +318,20 @@ export async function generateCareerSnapshot(input: SnapshotInput): Promise<Care
   if (!result) return fallback;
 
   return {
-    analysis: result.data.analysis ?? fallback.analysis,
-    skillGap: result.data.skillGap ?? fallback.skillGap,
-    projects: Array.isArray(result.data.projects) && result.data.projects.length ? result.data.projects : fallback.projects,
-    interviewQuestions: Array.isArray(result.data.interviewQuestions) && result.data.interviewQuestions.length ? result.data.interviewQuestions : fallback.interviewQuestions,
+    analysis: {
+      summary: String(result.data.analysis?.summary ?? fallback.analysis.summary).trim(),
+      strengths: sanitizeStringList(result.data.analysis?.strengths, 5).length ? sanitizeStringList(result.data.analysis?.strengths, 5) : fallback.analysis.strengths,
+      weaknesses: sanitizeStringList(result.data.analysis?.weaknesses, 5).length ? sanitizeStringList(result.data.analysis?.weaknesses, 5) : fallback.analysis.weaknesses,
+      missingSkills: sanitizeStringList(result.data.analysis?.missingSkills, 8).length ? sanitizeStringList(result.data.analysis?.missingSkills, 8) : fallback.analysis.missingSkills,
+    },
+    skillGap: {
+      role: String(result.data.skillGap?.role ?? fallback.skillGap.role).trim() || fallback.skillGap.role,
+      currentSkills: sanitizeStringList(result.data.skillGap?.currentSkills, 18).length ? sanitizeStringList(result.data.skillGap?.currentSkills, 18) : fallback.skillGap.currentSkills,
+      missingSkills: sanitizeStringList(result.data.skillGap?.missingSkills, 8).length ? sanitizeStringList(result.data.skillGap?.missingSkills, 8) : fallback.skillGap.missingSkills,
+      learningPath: sanitizeStringList(result.data.skillGap?.learningPath, 8).length ? sanitizeStringList(result.data.skillGap?.learningPath, 8) : fallback.skillGap.learningPath,
+    },
+    projects: sanitizeProjects(result.data.projects, fallback.projects),
+    interviewQuestions: sanitizeInterviewQuestions(result.data.interviewQuestions, fallback.interviewQuestions),
     progress: fallback.progress,
     aiProvider: result.provider,
   };
@@ -215,23 +339,23 @@ export async function generateCareerSnapshot(input: SnapshotInput): Promise<Care
 
 export async function generateProjectsForProfile(input: SnapshotInput) {
   const fallback = buildFallbackSnapshot(input);
-  const prompt = `Generate 3 to 5 portfolio-ready project ideas for a ${input.targetRole} candidate. Return JSON with a "projects" array. Each item must include title, summary, techStack, steps, difficulty, portfolioValue. Candidate context: ${JSON.stringify(input)}`;
+  const prompt = `Generate 3 to 5 portfolio-ready project ideas for a ${input.targetRole} candidate. Use only the provided profile data and keep the ideas relevant to the candidate's current skills and missing skills. Return JSON with a "projects" array. Each item must include title, summary, techStack, steps, difficulty, portfolioValue. Candidate context: ${JSON.stringify(input)}`;
 
   const result = await callAIJson<{ projects: CareerProject[] }>(prompt);
   return {
     aiProvider: result?.provider ?? fallback.aiProvider,
-    projects: result?.data.projects?.length ? result.data.projects : fallback.projects,
+    projects: sanitizeProjects(result?.data.projects, fallback.projects),
   };
 }
 
 export async function generateInterviewQuestionsForProfile(input: SnapshotInput) {
   const fallback = buildFallbackSnapshot(input);
-  const prompt = `Generate 4 realistic mock interview questions for a ${input.targetRole} candidate. Return JSON with "interviewQuestions". Each item must include question, focusArea, idealAnswerHint. Candidate context: ${JSON.stringify(input)}`;
+  const prompt = `Generate 4 realistic mock interview questions for a ${input.targetRole} candidate. Use only the provided profile data and keep each question aligned to the role and stated skill level. Return JSON with "interviewQuestions". Each item must include question, focusArea, idealAnswerHint. Candidate context: ${JSON.stringify(input)}`;
 
   const result = await callAIJson<{ interviewQuestions: InterviewQuestion[] }>(prompt);
   return {
     aiProvider: result?.provider ?? fallback.aiProvider,
-    interviewQuestions: result?.data.interviewQuestions?.length ? result.data.interviewQuestions : fallback.interviewQuestions,
+    interviewQuestions: sanitizeInterviewQuestions(result?.data.interviewQuestions, fallback.interviewQuestions),
   };
 }
 

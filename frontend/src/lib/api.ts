@@ -1,7 +1,9 @@
 import axios from 'axios';
 
+const baseURL = (process.env.NEXT_PUBLIC_API_URL || '/api').replace(/\/$/, '');
+
 const api = axios.create({
-  baseURL: '',
+  baseURL,
 });
 
 export type CareerProfile = {
@@ -56,6 +58,8 @@ export type AnalyzePayload = {
   careerGoals: string[];
   skills: string[];
   resumeText?: string;
+  resumeFileBase64?: string;
+  resumeFileName?: string;
 };
 
 export async function analyzeCareerProfile(payload: AnalyzePayload) {
