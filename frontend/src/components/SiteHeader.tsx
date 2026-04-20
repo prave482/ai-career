@@ -8,9 +8,9 @@ import { useTheme } from '@/components/ThemeProvider';
 const navItems = [
   { href: '/', label: 'Home' },
   { href: '/analyze', label: 'Resume Analyzer' },
-  { href: '/dashboard', label: 'Dashboard' },
   { href: '/projects', label: 'Projects' },
   { href: '/interview', label: 'Interview' },
+  { href: '/dashboard', label: 'Dashboard' },
   { href: '/progress', label: 'Progress' },
 ];
 
