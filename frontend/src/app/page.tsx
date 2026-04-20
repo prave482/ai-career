@@ -27,25 +27,25 @@ const featureCards = [
 export default function HomePage() {
   return (
     <div className="page-shell">
-      <section className="landing-hero surface">
+      <section className="landing-hero surface gradient-glow">
         <div className="landing-hero__copy">
           <p className="eyebrow">AI Career Copilot</p>
-          <h1>A multi-page career website built for real resume analysis.</h1>
+          <h1>Your AI-powered career roadmap builder</h1>
           <p className="lead-copy">
             Move through a proper product flow instead of a single long page. Analyze your profile,
             explore project ideas, practice interviews, and track progress across dedicated pages.
           </p>
           <div className="hero-actions">
             <Link href="/analyze" className="primary-button">
-              Start With Resume Analyzer
+              Start Analysis
+              <ArrowRight size={16} />
             </Link>
             <Link href="/dashboard" className="secondary-button">
-              Open Dashboard
-              <ArrowRight size={16} />
+              View Dashboard
             </Link>
           </div>
           <div className="tag-row">
-            <span className="tag"><Sparkles size={14} /> OpenAI / LLaMA ready</span>
+            <span className="tag"><Sparkles size={14} /> OpenAI / LLaMA</span>
             <span className="tag"><BriefcaseBusiness size={14} /> Portfolio planning</span>
             <span className="tag"><Mic size={14} /> Interview practice</span>
           </div>
@@ -70,7 +70,7 @@ export default function HomePage() {
             <Sparkles size={18} />
             <div>
               <strong>Production-ready flow</strong>
-              <p>Frontend pages are connected to backend REST APIs and database storage.</p>
+              <p>Frontend connected to backend REST APIs and database.</p>
             </div>
           </div>
         </div>

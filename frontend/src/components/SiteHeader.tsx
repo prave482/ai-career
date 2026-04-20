@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BriefcaseBusiness, LayoutDashboard, LineChart, Mic, Sparkles, Target } from 'lucide-react';
+import { BriefcaseBusiness, LayoutDashboard, LineChart, Mic, Sparkles, Sun, Moon, Target } from 'lucide-react';
+import { useTheme } from '@/components/ThemeProvider';
 
 const navItems = [
   { href: '/', label: 'Home' },
@@ -15,6 +16,7 @@ const navItems = [
 
 export default function SiteHeader() {
   const pathname = usePathname();
+  const { theme, toggleTheme } = useTheme();
 
   return (
     <header className="site-header">
@@ -42,6 +44,10 @@ export default function SiteHeader() {
         </nav>
 
         <div className="site-header__actions">
+          <button onClick={toggleTheme} className="site-chip theme-toggle" aria-label="Toggle theme">
+            {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+          </button>
           <Link href="/analyze" className="site-chip">
             <Target size={15} />
             <span>Start Analysis</span>
