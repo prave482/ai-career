@@ -56,8 +56,6 @@ export type AnalyzePayload = {
   careerGoals: string[];
   skills: string[];
   resumeText?: string;
-  resumeFileName?: string;
-  resumeFileBase64?: string;
 };
 
 export async function analyzeCareerProfile(payload: AnalyzePayload) {
